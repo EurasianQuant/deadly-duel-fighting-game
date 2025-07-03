@@ -1,0 +1,403 @@
+@import "tailwindcss";
+
+
+/* ===============================================
+   DEADLY DUEL - IMPROVED CSS ARCHITECTURE
+   =============================================== */
+
+/* Standard CSS Custom Properties (replacing @theme) */
+:root {
+  /* Fonts */
+  --font-family-arcade-header: "Press Start 2P", monospace;
+  --font-family-arcade-body: "VT323", monospace;
+  
+  /* Color Palette */
+  --color-arcade-white: #ffffff;
+  --color-arcade-yellow: #fbbf24;
+  --color-arcade-red: #ef4444;
+  --color-arcade-green: #22c55e;
+  --color-arcade-gray: #6b7280;
+  --color-arcade-dark-gray: #4b5563;
+  --color-arcade-black: #000000;
+  --color-arcade-bg: #1a1a1a;
+  --color-arcade-panel: rgba(0, 0, 0, 0.75);
+  
+  /* Game-specific colors */
+  --color-game-bg: #1a1a1a;
+  --color-game-primary: var(--color-arcade-yellow);
+  --color-game-secondary: var(--color-arcade-red);
+  --color-game-success: var(--color-arcade-green);
+  --color-game-text: var(--color-arcade-white);
+  --color-game-disabled: var(--color-arcade-gray);
+  
+  /* Responsive spacing */
+  --spacing-hud: 1rem;
+  --spacing-menu: 1rem;
+  
+  /* Responsive border widths */
+  --border-thin: 1px;
+  --border-thick: 2px;
+  
+  /* Responsive font sizes - mobile first */
+  --font-size-xs: 0.75rem;   /* 12px */
+  --font-size-sm: 1rem;      /* 16px */
+  --font-size-base: 1.25rem; /* 20px */
+  --font-size-lg: 1.5rem;    /* 24px */
+  --font-size-xl: 2rem;      /* 32px */
+  --font-size-2xl: 2.5rem;   /* 40px */
+  --font-size-3xl: 3rem;     /* 48px */
+  
+  /* Phaser scene standardized font sizes */
+  --phaser-font-title: 42px;
+  --phaser-font-header: 32px;
+  --phaser-font-subheader: 24px;
+  --phaser-font-body: 16px;
+  --phaser-font-small: 12px;
+  
+  /* Phaser scene color constants (hex values for Phaser) */
+  --phaser-color-primary: #fbbf24;
+  --phaser-color-secondary: #ef4444;
+  --phaser-color-success: #22c55e;
+  --phaser-color-white: #ffffff;
+  --phaser-color-black: #000000;
+  --phaser-color-gray: #6b7280;
+  --phaser-color-dark-gray: #4b5563;
+}
+
+/* Tablet and larger screens */
+@media (min-width: 768px) {
+  :root {
+    --spacing-hud: 2rem;
+    --spacing-menu: 1.5rem;
+    --border-thin: 2px;
+    --border-thick: 4px;
+    
+    /* Larger font sizes for bigger screens */
+    --font-size-xl: 2.5rem;    /* 40px */
+    --font-size-2xl: 3rem;     /* 48px */
+    --font-size-3xl: 3.75rem;  /* 60px */
+  }
+}
+
+/* Desktop screens */
+@media (min-width: 1024px) {
+  :root {
+    --font-size-3xl: 4rem;     /* 64px */
+  }
+}
+
+/* ===============================================
+   GLOBAL STYLES
+   =============================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-family-arcade-body);
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+  font-smooth: never;
+}
+
+body {
+  background-color: var(--color-game-bg);
+  color: var(--color-game-text);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* ===============================================
+   ESSENTIAL GAME-SPECIFIC COMPONENTS
+   (Minimal custom classes, let Tailwind handle most styling)
+   =============================================== */
+
+/* Health Bar - Game-specific component that needs custom styling */
+.health-bar-container {
+  height: 2rem;
+  background: #1f2937;
+  border: var(--border-thin) solid var(--color-arcade-white);
+  position: relative;
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .health-bar-container {
+    height: 2.5rem;
+  }
+}
+
+.health-bar-fill {
+  height: 100%;
+  background: var(--color-arcade-green);
+  transition: width 0.3s ease;
+}
+
+.health-bar-fill.danger {
+  background: var(--color-arcade-red);
+}
+
+/* Game Timer - Needs specific arcade styling */
+.game-timer {
+  font-family: var(--font-family-arcade-header);
+  font-size: var(--font-size-2xl);
+  color: var(--color-arcade-yellow);
+  background: var(--color-arcade-black);
+  border: var(--border-thick) solid var(--color-arcade-yellow);
+  padding: 0.5rem;
+  text-align: center;
+  min-width: 4rem;
+}
+
+@media (min-width: 768px) {
+  .game-timer {
+    font-size: var(--font-size-3xl);
+    padding: 1rem;
+    min-width: 8rem;
+  }
+}
+
+/* Player Names - Responsive sizing */
+.player-name {
+  font-family: var(--font-family-arcade-body);
+  font-size: var(--font-size-base);
+  color: var(--color-arcade-white);
+}
+
+@media (min-width: 768px) {
+  .player-name {
+    font-size: var(--font-size-lg);
+  }
+}
+
+/* Round Indicators */
+.round-indicator {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  border: 1px solid var(--color-arcade-white);
+}
+
+@media (min-width: 768px) {
+  .round-indicator {
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+.round-indicator.inactive {
+  background: var(--color-arcade-dark-gray);
+}
+
+.round-indicator.won {
+  background: var(--color-arcade-yellow);
+}
+
+/* Character Portraits - Responsive sizing */
+.character-portrait {
+  width: 6rem;
+  height: 6rem;
+  border: var(--border-thick) solid var(--color-arcade-gray);
+  background: var(--color-arcade-panel);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+@media (min-width: 768px) {
+  .character-portrait {
+    width: 8rem;
+    height: 8rem;
+  }
+}
+
+.character-portrait:hover {
+  border-color: var(--color-arcade-white);
+}
+
+.character-portrait.selected-p1 {
+  border-color: var(--color-arcade-yellow);
+  box-shadow: 0 0 12px var(--color-arcade-yellow);
+}
+
+.character-portrait.selected-p2 {
+  border-color: var(--color-arcade-red);
+  box-shadow: 0 0 12px var(--color-arcade-red);
+}
+
+/* ===============================================
+   IMPROVED FOCUS HANDLING
+   =============================================== */
+
+/* Better focus handling for accessibility */
+.btn-arcade:focus-visible {
+  outline: 2px solid var(--color-arcade-yellow);
+  outline-offset: 2px;
+}
+
+/* ===============================================
+   UTILITY CLASSES
+   =============================================== */
+
+.font-arcade-header {
+  font-family: var(--font-family-arcade-header);
+  text-transform: uppercase;
+}
+
+.font-arcade-body {
+  font-family: var(--font-family-arcade-body);
+}
+
+.pixel-perfect {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: -webkit-crisp-edges;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: -o-crisp-edges;
+  image-rendering: pixelated;
+}
+
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* ===============================================
+   ARCADE BUTTON SYSTEM
+   =============================================== */
+
+.btn-arcade {
+  font-family: var(--font-family-arcade-header);
+  text-transform: uppercase;
+  background: var(--color-arcade-black);
+  color: var(--color-arcade-white);
+  border: var(--border-thick) solid var(--color-arcade-yellow);
+  padding: var(--spacing-menu);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+  position: relative;
+  user-select: none;
+}
+
+.btn-arcade:hover {
+  background: var(--color-arcade-yellow);
+  color: var(--color-arcade-black);
+  box-shadow: 0 0 12px var(--color-arcade-yellow);
+}
+
+.btn-arcade:active {
+  transform: scale(0.95);
+}
+
+.btn-main-menu {
+  font-size: var(--font-size-lg);
+  padding: 1rem 2rem;
+  min-width: 12rem;
+}
+
+@media (min-width: 768px) {
+  .btn-main-menu {
+    font-size: var(--font-size-xl);
+    padding: 1.5rem 3rem;
+    min-width: 16rem;
+  }
+}
+
+.btn-ui {
+  font-size: var(--font-size-sm);
+  padding: 0.75rem 1.5rem;
+  min-width: 8rem;
+}
+
+@media (min-width: 768px) {
+  .btn-ui {
+    font-size: var(--font-size-base);
+    padding: 1rem 2rem;
+    min-width: 10rem;
+  }
+}
+
+/* ===============================================
+   GAME PANEL SYSTEM
+   =============================================== */
+
+.game-panel {
+  background: var(--color-arcade-panel);
+  border: var(--border-thick) solid var(--color-arcade-yellow);
+  padding: var(--spacing-menu);
+  position: relative;
+  backdrop-filter: blur(2px);
+}
+
+.game-panel.large {
+  padding: calc(var(--spacing-menu) * 1.5);
+}
+
+.game-panel.transparent {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.game-panel-header {
+  font-family: var(--font-family-arcade-header);
+  font-size: var(--font-size-lg);
+  color: var(--color-arcade-yellow);
+  text-align: center;
+  margin-bottom: var(--spacing-menu);
+  text-transform: uppercase;
+}
+
+@media (min-width: 768px) {
+  .game-panel-header {
+    font-size: var(--font-size-xl);
+  }
+}
+
+/* ===============================================
+   ARCADE GLOW EFFECTS
+   =============================================== */
+
+.arcade-glow {
+  position: relative;
+}
+
+.arcade-glow::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(45deg, var(--color-arcade-yellow), transparent, var(--color-arcade-yellow));
+  border-radius: inherit;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.arcade-glow:hover::before {
+  opacity: 0.7;
+}
+
+/* ===============================================
+   PHASER GAME CONTAINER
+   =============================================== */
+
+#phaser-game {
+  margin: 0 auto;
+  display: block;
+  max-width: 100vw;
+  max-height: 100vh;
+}
+
+/* Responsive game container */
+@media (max-width: 767px) {
+  #phaser-game {
+    width: 100vw !important;
+    height: auto !important;
+  }
+}
