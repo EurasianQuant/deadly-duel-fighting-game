@@ -15,9 +15,11 @@ export const HealthBar: React.FC<HealthBarProps> = ({
     className = "",
     direction = 'left',
 }) => {
+    // Ensure very small health values are treated as 0 to prevent UI artifacts
+    const adjustedHealth = currentHealth < 0.01 ? 0 : currentHealth;
     const healthPercentage = Math.max(
         0,
-        Math.min(100, (currentHealth / maxHealth) * 100)
+        Math.min(100, (adjustedHealth / maxHealth) * 100)
     );
 
     const isRightDirection = direction === 'right';

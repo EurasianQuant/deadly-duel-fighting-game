@@ -18,7 +18,7 @@ class GamePauseService {
     scene.scene.pause();
 
     // Emit pause event for React components
-    (EventBus as any).emit("game-paused", {
+    EventBus.emit("game-paused", {
       gameMode,
       sceneName: scene.scene.key
     });
@@ -35,7 +35,7 @@ class GamePauseService {
     this.currentScene.scene.resume();
 
     // Emit resume event for React components
-    (EventBus as any).emit("game-resumed", {
+    EventBus.emit("game-resumed", {
       gameMode: this.currentGameMode,
       sceneName: this.currentScene.scene.key
     });
@@ -57,7 +57,7 @@ class GamePauseService {
     this.currentScene.scene.start("MainMenuScene");
 
     // Emit main menu navigation event
-    (EventBus as any).emit("game-exit-to-menu", {
+    EventBus.emit("game-exit-to-menu", {
       fromGameMode: this.currentGameMode,
       fromScene: this.currentScene.scene.key
     });

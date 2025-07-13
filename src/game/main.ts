@@ -1,7 +1,5 @@
 import {
-    AUTO,
     WEBGL,
-    CANVAS,
     Game,
 } from "phaser";
 

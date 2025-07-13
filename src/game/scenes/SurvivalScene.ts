@@ -49,6 +49,8 @@ export class SurvivalScene extends Scene {
     // Survival specific data
     private survivalData!: SurvivalData;
     private betweenRoundsMode: boolean = false;
+    private survivalEnded: boolean = false;
+    private gameOverScreenShown: boolean = false;
     private countdownTimer: number = 0;
     private roundStartHealth: number = 0;
 
@@ -104,6 +106,11 @@ export class SurvivalScene extends Scene {
         // Clear ALL survival-related data to ensure completely fresh start
         this.registry.remove("survivalData");
         localStorage.removeItem("survivalData"); // Remove any localStorage survival data
+
+        // Reset survival state flags
+        this.survivalEnded = false;
+        this.betweenRoundsMode = false;
+        this.gameOverScreenShown = false;
 
         // Always start fresh - only preserve high score from localStorage
         this.survivalData = {
@@ -218,6 +225,12 @@ export class SurvivalScene extends Scene {
             if (!gamePauseService.isPaused()) {
                 gamePauseService.pauseGame("survival", this);
             }
+        });
+        
+        // Listen for H key to toggle hitbox debug
+        this.input.keyboard!.on("keydown-H", () => {
+            this.player.toggleHitboxDebug();
+            this.enemies.forEach(enemy => enemy.toggleHitboxDebug());
         });
     }
 
@@ -483,6 +496,22 @@ export class SurvivalScene extends Scene {
         debug.general("Round fighting started");
     }
 
+    private stopAllEnemies(): void {
+        this.enemies.forEach((enemy) => {
+            if (enemy && enemy.body) {
+                const body = enemy.body as Phaser.Physics.Arcade.Body;
+                body.setVelocity(0, 0);
+                body.setAcceleration(0);
+                // Only force idle animation if the enemy isn't defeated
+                if (enemy.health > 0) {
+                    enemy.anims?.play("idle", true);
+                    enemy.currentState = "idle";
+                }
+            }
+        });
+        console.log("🛑 SURVIVAL: All enemies stopped");
+    }
+
     private clearEnemies(): void {
         this.enemies.forEach((enemy) => enemy.destroy());
         this.aiControllers = [];
@@ -490,10 +519,17 @@ export class SurvivalScene extends Scene {
     }
 
     private checkRoundEnd(): void {
-        if (this.betweenRoundsMode) return;
+        if (this.betweenRoundsMode || this.survivalEnded) return;
 
         // Check if player is defeated
         if (this.player.health <= 0) {
+            console.log("💀 SURVIVAL: Player defeated, stopping all enemies and ending survival");
+            this.stopAllEnemies();
+            
+            // Immediate game over screen as backup
+            this.showGameOverScreen();
+            
+            // Also call endSurvival for data saving, but don't depend on it for UI
             this.endSurvival();
             return;
         }
@@ -570,7 +606,19 @@ export class SurvivalScene extends Scene {
         // Initialize game store for Survival mode
         const gameStore = useGameStore.getState();
 
-        // Add players to store
+        // Clear any existing players to prevent health persistence from previous matches
+        gameStore.removePlayer("player1");
+        gameStore.removePlayer("player2");
+        
+        // Reset game state completely to ensure clean start
+        gameStore.resetGame();
+        
+        // Set survival mode state
+        useGameStore.setState({
+            currentState: GameState.PLAYING,
+        });
+
+        // Add players to store with fresh health values
         gameStore.addPlayer({
             id: "player1",
             health: this.player.health,
@@ -614,10 +662,14 @@ export class SurvivalScene extends Scene {
     private emitHealthUpdate(): void {
         const gameStore = useGameStore.getState();
 
+        // Ensure health precision for UI display (force 0 when health is very low)
+        const playerHealth = this.player.health < 0.01 ? 0 : this.player.health;
+        const enemyHealth = this.enemies.length > 0 && this.enemies[0].health < 0.01 ? 0 : (this.enemies.length > 0 ? this.enemies[0].health : 0);
+
         const enemyHealthData =
             this.enemies.length > 0
                 ? {
-                      health: this.enemies[0].health,
+                      health: enemyHealth,
                       maxHealth: this.enemies[0].maxHealth,
                       name: `Enemy ${this.enemies.length > 0 ? "1" : "None"}`,
                   }
@@ -629,7 +681,7 @@ export class SurvivalScene extends Scene {
 
         // Update players in game store for React HUD
         gameStore.updatePlayer("player1", {
-            health: this.player.health,
+            health: playerHealth,
             maxHealth: this.player.maxHealth,
             name: this.player.fighterName,
         });
@@ -639,7 +691,7 @@ export class SurvivalScene extends Scene {
         // Also emit legacy event for backwards compatibility
         EventBus.emit("health-update", {
             player1: {
-                health: this.player.health,
+                health: playerHealth,
                 maxHealth: this.player.maxHealth,
                 name: this.player.fighterName,
             },
@@ -677,12 +729,25 @@ export class SurvivalScene extends Scene {
     }
 
     private async endSurvival(): Promise<void> {
+        console.log("🏁 SURVIVAL: endSurvival() called");
         debug.general("Survival mode ended");
+        
+        // Prevent multiple calls to endSurvival
+        if (this.survivalEnded) {
+            console.log("🏁 SURVIVAL: Already ended, returning early");
+            return;
+        }
+        this.survivalEnded = true;
+        console.log("🏁 SURVIVAL: Set survivalEnded = true");
 
-        // Reset round indicators when game ends
+        // Reset round indicators and clean up game store when game ends
         const gameStore = useGameStore.getState();
         gameStore.updateMatchScore("player1", 0);
         gameStore.updateMatchScore("player2", 0);
+        
+        // Ensure defeated player health is exactly 0 in the store
+        gameStore.updatePlayer("player1", { health: 0 });
+        gameStore.updatePlayer("player2", { health: 0 });
 
         // Calculate total play time
         const totalPlayTime = (this.time.now - this.survivalData.gameStartTime) / 1000;
@@ -696,34 +761,41 @@ export class SurvivalScene extends Scene {
         // Get player profile for player name
         const playerProfile = hybridLeaderboardService.getPlayerProfile();
 
-        // Add survival entry to leaderboard (instant memory update + async persistence)
-        await hybridLeaderboardService.addSurvivalEntry({
-            playerName: playerProfile.playerName,
-            character: selectedCharacterId,
-            score: this.survivalData.score,
-            roundsCompleted: this.survivalData.currentRound - 1,
-            perfectRounds: this.survivalData.perfectRounds,
-            enemiesDefeated: this.survivalData.defeatedOpponents,
-            finalMultiplier: this.survivalData.streakMultiplier,
-            timestamp: Date.now(),
-            playTime: totalPlayTime,
-        });
+        // Add survival entry to leaderboard (with error handling)
+        try {
+            console.log("🏁 SURVIVAL: Saving to leaderboard...");
+            await hybridLeaderboardService.addSurvivalEntry({
+                playerName: playerProfile.playerName,
+                character: selectedCharacterId,
+                score: this.survivalData.score,
+                roundsCompleted: this.survivalData.currentRound - 1,
+                perfectRounds: this.survivalData.perfectRounds,
+                enemiesDefeated: this.survivalData.defeatedOpponents,
+                finalMultiplier: this.survivalData.streakMultiplier,
+                timestamp: Date.now(),
+                playTime: totalPlayTime,
+            });
 
-        // Update character statistics (instant memory update + async persistence)
-        hybridLeaderboardService.updateCharacterStats(selectedCharacterId, {
-            matchesPlayed: 1,
-            survivalBestRound: Math.max(
-                playerProfile.characterStats[selectedCharacterId]?.survivalBestRound || 0,
-                this.survivalData.currentRound - 1
-            ),
-            survivalBestScore: Math.max(
-                playerProfile.characterStats[selectedCharacterId]?.survivalBestScore || 0,
-                this.survivalData.score
-            ),
-            survivalTotalScore: (playerProfile.characterStats[selectedCharacterId]?.survivalTotalScore || 0) + this.survivalData.score,
-            perfectRounds: (playerProfile.characterStats[selectedCharacterId]?.perfectRounds || 0) + this.survivalData.perfectRounds,
-            totalPlayTime: (playerProfile.characterStats[selectedCharacterId]?.totalPlayTime || 0) + totalPlayTime,
-        });
+            // Update character statistics (instant memory update + async persistence)
+            hybridLeaderboardService.updateCharacterStats(selectedCharacterId, {
+                matchesPlayed: 1,
+                survivalBestRound: Math.max(
+                    playerProfile.characterStats[selectedCharacterId]?.survivalBestRound || 0,
+                    this.survivalData.currentRound - 1
+                ),
+                survivalBestScore: Math.max(
+                    playerProfile.characterStats[selectedCharacterId]?.survivalBestScore || 0,
+                    this.survivalData.score
+                ),
+                survivalTotalScore: (playerProfile.characterStats[selectedCharacterId]?.survivalTotalScore || 0) + this.survivalData.score,
+                perfectRounds: (playerProfile.characterStats[selectedCharacterId]?.perfectRounds || 0) + this.survivalData.perfectRounds,
+                totalPlayTime: (playerProfile.characterStats[selectedCharacterId]?.totalPlayTime || 0) + totalPlayTime,
+            });
+            console.log("🏁 SURVIVAL: Leaderboard save completed");
+        } catch (error) {
+            console.error("🏁 SURVIVAL: Error saving to leaderboard:", error);
+            // Continue anyway - don't let leaderboard errors block game over screen
+        }
 
         // Update high score if necessary (keep legacy localStorage for compatibility)
         if (this.survivalData.score > this.survivalData.highScore) {
@@ -751,15 +823,27 @@ export class SurvivalScene extends Scene {
             playTime: hybridLeaderboardService.formatTime(totalPlayTime),
         });
 
-        // Show game over screen
-        this.showGameOverScreen();
+        // Show game over screen only if not already shown
+        console.log("🏁 SURVIVAL: endSurvival completed, game over screen should already be visible");
     }
 
     private showGameOverScreen(): void {
+        console.log("🏁 SURVIVAL: showGameOverScreen() called");
+        
+        // Prevent multiple game over screens
+        if (this.gameOverScreenShown) {
+            console.log("🏁 SURVIVAL: Game over screen already shown, skipping");
+            return;
+        }
+        this.gameOverScreenShown = true;
+        this.survivalEnded = true;
+        
         const { width, height } = this.cameras.main;
 
         // Overlay
-        this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.8);
+        const overlay = this.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.8);
+        overlay.setDepth(1000); // Ensure overlay is on top
+        console.log("🏁 SURVIVAL: Game over overlay created");
 
         // Game Over text
         const gameOverText = this.add.text(
@@ -776,6 +860,8 @@ export class SurvivalScene extends Scene {
             }
         );
         gameOverText.setOrigin(0.5);
+        gameOverText.setDepth(1001); // Ensure text is on top
+        console.log("🏁 SURVIVAL: Game over text created");
 
         // Stats
         const statsText = this.add.text(
@@ -797,12 +883,13 @@ export class SurvivalScene extends Scene {
             }
         );
         statsText.setOrigin(0.5);
+        statsText.setDepth(1001); // Ensure text is on top
 
         // Continue instruction
         const continueText = this.add.text(
             width / 2,
             height / 2 + 150,
-            "Press ENTER to return to menu",
+            "Press ENTER or SPACE to return to menu",
             {
                 fontFamily: "Press Start 2P",
                 fontSize: "20px",
@@ -811,46 +898,72 @@ export class SurvivalScene extends Scene {
             }
         );
         continueText.setOrigin(0.5);
+        continueText.setDepth(1001); // Ensure text is on top
+        console.log("🏁 SURVIVAL: Continue instruction created");
 
-        // Handle input for returning to menu
-        this.input.keyboard!.once("keydown-ENTER", () => {
+        // Handle input for returning to menu - multiple options
+        console.log("🏁 SURVIVAL: Setting up input handlers");
+        const returnToMenu = () => {
+            console.log("🏁 SURVIVAL: Input detected, returning to menu");
             this.scene.start("ArcadeModeSelectScene");
+        };
+        
+        this.input.keyboard!.once("keydown-ENTER", returnToMenu);
+        this.input.keyboard!.once("keydown-SPACE", returnToMenu);
+        this.input.keyboard!.once("keydown-ESC", returnToMenu);
+        
+        // Also add a backup timer in case input doesn't work
+        this.time.delayedCall(10000, () => {
+            console.log("🏁 SURVIVAL: Backup timer triggered, returning to menu");
+            returnToMenu();
         });
+        
+        console.log("🏁 SURVIVAL: Game over screen setup complete");
     }
 
     update(time: number, delta: number): void {
-        if (this.betweenRoundsMode) return;
+        if (this.betweenRoundsMode || this.survivalEnded) return;
 
-        // Update player
-        this.handleInput();
+        // Always update player for animation purposes
         this.player.update(delta);
+        
+        // Only handle input and AI if player is alive
+        if (this.player.health > 0) {
+            // Update player input
+            this.handleInput();
 
-        // Update enemies and AI
-        this.enemies.forEach((enemy, index) => {
-            if (enemy.health > 0) {
+            // Update enemies and AI
+            this.enemies.forEach((enemy, index) => {
+                if (enemy.health > 0) {
+                    enemy.update(delta);
+                    // Calculate distance and difficulty
+                    const distance = Math.abs(enemy.x - this.player.x);
+                    const difficulty = {
+                        aggression: 1.0,
+                        reaction: 1.0,
+                        strategy: 1.0,
+                        level: 1.0,
+                    };
+                    this.aiControllers[index]?.updateAI(
+                        enemy,
+                        this.player,
+                        distance,
+                        difficulty
+                    );
+                }
+            });
+
+            // Check for combat collisions only if player is alive
+            this.checkCombatCollisions();
+        } else {
+            // Player is dead - just update enemy animations but no AI
+            this.enemies.forEach((enemy) => {
                 enemy.update(delta);
-                // Calculate distance and difficulty
-                const distance = Math.abs(enemy.x - this.player.x);
-                const difficulty = {
-                    aggression: 1.0,
-                    reaction: 1.0,
-                    strategy: 1.0,
-                    level: 1.0,
-                };
-                this.aiControllers[index]?.updateAI(
-                    enemy,
-                    this.player,
-                    distance,
-                    difficulty
-                );
-            }
-        });
+            });
+        }
 
         // Update grounded states for proper animation transitions
         this.updateGroundedStates();
-
-        // Check for combat collisions
-        this.checkCombatCollisions();
 
         // Check round end conditions
         this.checkRoundEnd();
@@ -876,9 +989,7 @@ export class SurvivalScene extends Scene {
         }
 
         // Attacks
-        if (this.inputManager.isLightAttackPressed()) {
-            this.player.attack("light");
-        } else if (this.inputManager.isHeavyAttackPressed()) {
+        if (this.inputManager.isHeavyAttackPressed()) {
             this.player.attack("heavy");
         } else if (this.inputManager.isSpecialAttackPressed()) {
             this.player.attack("special");
@@ -952,14 +1063,12 @@ export class SurvivalScene extends Scene {
 
     private getAttackDamage(attackType: string): number {
         switch (attackType) {
-            case "light":
-                return GAME_CONFIG.COMBAT.LIGHT_DAMAGE;
             case "heavy":
                 return GAME_CONFIG.COMBAT.HEAVY_DAMAGE;
             case "special":
                 return GAME_CONFIG.COMBAT.SPECIAL_DAMAGE;
             default:
-                return 0;
+                return GAME_CONFIG.COMBAT.HEAVY_DAMAGE;
         }
     }
 
@@ -987,8 +1096,15 @@ export class SurvivalScene extends Scene {
         // Clean up enemies and AI controllers
         this.clearEnemies();
         
+        // Clean up game store to prevent health persistence
+        const gameStore = useGameStore.getState();
+        gameStore.removePlayer("player1");
+        gameStore.removePlayer("player2");
+        gameStore.resetMatch();
+        
         // Reset flags
         this.betweenRoundsMode = false;
+        this.survivalEnded = false;
         
         // Clean up input
         this.input.keyboard!.removeAllListeners();

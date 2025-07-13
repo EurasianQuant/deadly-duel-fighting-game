@@ -5,6 +5,7 @@ import { hybridLeaderboardService } from "@/services/hybridLeaderboardService";
 import { logger } from "@/lib/logger";
 import debug from "@/lib/debug";
 import EventBus from "@/lib/EventBus";
+import { localStorageUtils } from "@/utils/localStorageUtils";
 
 export interface Achievement {
     id: string;
@@ -220,10 +221,10 @@ class AchievementService {
         EventBus.on('wallet-disconnected', this.onWalletDisconnected, this);
 
         // Listen for game events
-        (EventBus as any).on('survival-completed', this.onSurvivalCompleted, this);
-        (EventBus as any).on('tournament-completed', this.onTournamentCompleted, this);
-        (EventBus as any).on('timeattack-completed', this.onTimeAttackCompleted, this);
-        (EventBus as any).on('match-won', this.onMatchWon, this);
+        EventBus.on('survival-completed', this.onSurvivalCompleted, this);
+        EventBus.on('tournament-completed', this.onTournamentCompleted, this);
+        EventBus.on('timeattack-completed', this.onTimeAttackCompleted, this);
+        EventBus.on('match-won', this.onMatchWon, this);
     }
 
     private async onWalletConnected(): Promise<void> {
@@ -245,7 +246,7 @@ class AchievementService {
 
         try {
             // Load from localStorage as backup/cache
-            const localData = localStorage.getItem(`achievements_${walletAddress}`);
+            const localData = localStorageUtils.safeRead(`achievements_${walletAddress}`);
             if (localData) {
                 this.playerAchievements = JSON.parse(localData);
                 this.syncAchievementStates();
@@ -385,14 +386,14 @@ class AchievementService {
 
         // Save to localStorage
         if (this.playerAchievements.walletAddress) {
-            localStorage.setItem(
+            localStorageUtils.debouncedWriteObject(
                 `achievements_${this.playerAchievements.walletAddress}`,
-                JSON.stringify(this.playerAchievements)
+                this.playerAchievements
             );
         }
 
         // Emit achievement unlocked event
-        (EventBus as any).emit('achievement-unlocked', {
+        EventBus.emit('achievement-unlocked', {
             achievement,
             points,
             totalPoints: this.playerAchievements.totalPoints
@@ -503,10 +504,10 @@ class AchievementService {
     public cleanup(): void {
         EventBus.off('wallet-connected', this.onWalletConnected, this);
         EventBus.off('wallet-disconnected', this.onWalletDisconnected, this);
-        (EventBus as any).off('survival-completed', this.onSurvivalCompleted, this);
-        (EventBus as any).off('tournament-completed', this.onTournamentCompleted, this);
-        (EventBus as any).off('timeattack-completed', this.onTimeAttackCompleted, this);
-        (EventBus as any).off('match-won', this.onMatchWon, this);
+        EventBus.off('survival-completed', this.onSurvivalCompleted, this);
+        EventBus.off('tournament-completed', this.onTournamentCompleted, this);
+        EventBus.off('timeattack-completed', this.onTimeAttackCompleted, this);
+        EventBus.off('match-won', this.onMatchWon, this);
     }
 }
 

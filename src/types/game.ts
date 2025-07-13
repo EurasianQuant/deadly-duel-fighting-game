@@ -24,8 +24,8 @@ export interface GameStateData {
 
 // Enums for better type safety
 export type PlayerState = 'idle' | 'walking' | 'jumping' | 'attacking' | 'hurt' | 'defeated';
-export type GameMode = 'arcade' | 'training' | 'tournament';
-export type AttackType = 'light' | 'heavy' | 'special';
+export type GameMode = 'arcade' | 'training' | 'tournament' | 'survival' | 'timeattack' | 'normal';
+export type AttackType = 'heavy' | 'special';
 export type VFXType = 'hit-spark' | 'special-attack' | 'combo-effect' | 'screen-flash';
 
 
@@ -53,7 +53,6 @@ export interface FighterStats {
     health: number;
     speed: number;
     jumpVelocity: number;
-    lightDamage: number;
     heavyDamage: number;
     specialDamage: number;
     attackSpeed: number;
@@ -95,4 +94,52 @@ export interface PerformanceMetrics {
     memoryUsage?: number;
     renderTime: number;
     physicsTime: number;
+}
+
+// Event Bus and Scene types
+export interface SceneData {
+    [key: string]: unknown;
+}
+
+export interface LeaderboardEntry {
+    id: string;
+    playerName: string;
+    character: string;
+    score: number;
+    timestamp: number;
+    isGlobal?: boolean;
+    isLocal?: boolean;
+}
+
+export interface WalletState {
+    connected: boolean;
+    connecting: boolean;
+    publicKey: string | null;
+    walletType: string | null;
+    balance: number | null;
+    error: string | null;
+}
+
+export interface UserProfile {
+    id?: string;
+    wallet_address?: string;
+    username?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface GameModeConfig {
+    id: string;
+    name: string;
+    description: string;
+    enabled: boolean;
+    flow: {
+        characterSelection: boolean;
+        courseSelection?: boolean;
+    };
+}
+
+export interface HealthUpdateData {
+    player1: { health: number; maxHealth: number; name: string };
+    player2: { health: number; maxHealth: number; name: string };
 }

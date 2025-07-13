@@ -152,14 +152,20 @@ export class MatchManager {
         if (player1) {
             const body1 = player1.body as Phaser.Physics.Arcade.Body;
             body1?.setVelocity(0, 0);
-            player1.anims?.play("idle", true);
-            player1.currentState = "idle";
+            // Only force idle animation if the fighter isn't defeated
+            if (player1.health > 0) {
+                player1.anims?.play("idle", true);
+                player1.currentState = "idle";
+            }
         }
         if (player2) {
             const body2 = player2.body as Phaser.Physics.Arcade.Body;
             body2?.setVelocity(0, 0);
-            player2.anims?.play("idle", true);
-            player2.currentState = "idle";
+            // Only force idle animation if the fighter isn't defeated
+            if (player2.health > 0) {
+                player2.anims?.play("idle", true);
+                player2.currentState = "idle";
+            }
         }
     }
 

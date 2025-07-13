@@ -8,12 +8,11 @@ import { PauseOverlay } from "./components/game/PauseOverlay";
 import { AchievementNotification } from "./components/game/AchievementNotification";
 import { MainMenu } from "./components/menus/MainMenu";
 import { useGameEvents } from "./hooks/useGameEvents";
+import type { GameMode } from "./types/game";
 import EventBus from "./lib/EventBus";
 import { PhaserGame } from "./PhaserGame";
-import {
-    GameMode,
-    gamePauseService,
-} from "./services/gamePauseService";
+import { gamePauseService } from "./services/gamePauseService";
+import { ErrorBoundary } from "./components/ui";
 import { LeaderboardMigration } from "./services/leaderboardMigration";
 import { achievementService } from "./services/achievementService";
 
@@ -22,9 +21,6 @@ import { achievementService } from "./services/achievementService";
 function App() {
     const [currentScene, setCurrentScene] = useState<string>("");
     const [isPaused, setIsPaused] = useState<boolean>(false);
-    const [currentGameMode, setCurrentGameMode] = useState<GameMode | null>(
-        null
-    );
     // const currentGameState = useGameStore(gameSelectors.getCurrentState); // Unused
 
     // Initialize game events hook to bridge Phaser and React
@@ -56,17 +52,14 @@ function App() {
 
         const handleGamePaused = ({ gameMode }: { gameMode: GameMode }) => {
             setIsPaused(true);
-            setCurrentGameMode(gameMode);
         };
 
         const handleGameResumed = () => {
             setIsPaused(false);
-            setCurrentGameMode(null);
         };
 
         const handleGameExitToMenu = () => {
             setIsPaused(false);
-            setCurrentGameMode(null);
         };
 
         // Online menu handlers removed - using offline game only
@@ -81,15 +74,15 @@ function App() {
         // };
 
         EventBus.on("current-scene-ready", handleSceneReady);
-        (EventBus as any).on("game-paused", handleGamePaused);
-        (EventBus as any).on("game-resumed", handleGameResumed);
-        (EventBus as any).on("game-exit-to-menu", handleGameExitToMenu);
+        EventBus.on("game-paused", handleGamePaused);
+        EventBus.on("game-resumed", handleGameResumed);
+        EventBus.on("game-exit-to-menu", handleGameExitToMenu);
 
         return () => {
             EventBus.off("current-scene-ready", handleSceneReady);
-            (EventBus as any).off("game-paused", handleGamePaused);
-            (EventBus as any).off("game-resumed", handleGameResumed);
-            (EventBus as any).off("game-exit-to-menu", handleGameExitToMenu);
+            EventBus.off("game-paused", handleGamePaused);
+            EventBus.off("game-resumed", handleGameResumed);
+            EventBus.off("game-exit-to-menu", handleGameExitToMenu);
         };
     }, []);
 
@@ -104,47 +97,49 @@ function App() {
     // const shouldShowOnlineMenu = false; // Unused
 
     return (
-        <div className="w-full h-screen relative bg-game-bg font-arcade-body">
-            {/* Phaser Game Canvas - Always visible */}
-            <PhaserGame />
+        <ErrorBoundary>
+            <div className="w-full h-screen relative bg-game-bg font-arcade-body">
+                {/* Phaser Game Canvas - Always visible */}
+                <PhaserGame />
 
-            {/* React UI Overlays - Only show when appropriate */}
-            {showReactMenu && (
-                <div className="absolute inset-0 z-20 flex items-center justify-center">
-                    <MainMenu
-                        onStartArcade={() => console.log("Arcade from React")}
-                        onStartOnline={() => console.log("Online from React")}
-                        onShowLeaderboard={() =>
-                            console.log("Leaderboard from React")
-                        }
-                        onShowSettings={() =>
-                            console.log("Settings from React")
-                        }
-                    />
-                </div>
-            )}
+                {/* React UI Overlays - Only show when appropriate */}
+                {showReactMenu && (
+                    <div className="absolute inset-0 z-20 flex items-center justify-center">
+                        <MainMenu
+                            onStartArcade={() => console.log("Arcade from React")}
+                            onStartOnline={() => console.log("Online from React")}
+                            onShowLeaderboard={() =>
+                                console.log("Leaderboard from React")
+                            }
+                            onShowSettings={() =>
+                                console.log("Settings from React")
+                            }
+                        />
+                    </div>
+                )}
 
-            {/* Online Play Menu - Disabled */}
+                {/* Online Play Menu - Disabled */}
 
-            {/* Leaderboard and Player Profile screens disabled - using Phaser scenes instead */}
+                {/* Leaderboard and Player Profile screens disabled - using Phaser scenes instead */}
 
-            {/* Game HUD (shown when in game scenes) */}
-            {showGameHUD && (
-                <div className="absolute inset-0 pointer-events-none z-50">
-                    <GameHUD className="pointer-events-auto" />
-                </div>
-            )}
+                {/* Game HUD (shown when in game scenes) */}
+                {showGameHUD && (
+                    <div className="absolute inset-0 pointer-events-none z-50">
+                        <GameHUD className="pointer-events-auto" />
+                    </div>
+                )}
 
-            {/* Achievement Notifications */}
-            <AchievementNotification />
+                {/* Achievement Notifications */}
+                <AchievementNotification />
 
-            {/* Pause Overlay */}
-            <PauseOverlay
-                isVisible={isPaused}
-                onResume={handleResumeGame}
-                onMainMenu={handleReturnToMainMenu}
-            />
-        </div>
+                {/* Pause Overlay */}
+                <PauseOverlay
+                    isVisible={isPaused}
+                    onResume={handleResumeGame}
+                    onMainMenu={handleReturnToMainMenu}
+                />
+            </div>
+        </ErrorBoundary>
     );
 }
 

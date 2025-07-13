@@ -12,7 +12,6 @@ export class InputManager {
     public down: Phaser.Input.Keyboard.Key;
 
     // Attack keys
-    public lightAttack: Phaser.Input.Keyboard.Key;
     public heavyAttack: Phaser.Input.Keyboard.Key;
     public specialAttack: Phaser.Input.Keyboard.Key;
 
@@ -37,9 +36,6 @@ export class InputManager {
             GAME_CONFIG.CONTROLS.PLAYER_1.DOWN
         );
 
-        this.lightAttack = this.scene.input.keyboard.addKey(
-            GAME_CONFIG.CONTROLS.PLAYER_1.LIGHT
-        );
         this.heavyAttack = this.scene.input.keyboard.addKey(
             GAME_CONFIG.CONTROLS.PLAYER_1.HEAVY
         );
@@ -65,9 +61,6 @@ export class InputManager {
         return this.down.isDown;
     }
 
-    public isLightAttackPressed(): boolean {
-        return Phaser.Input.Keyboard.JustDown(this.lightAttack);
-    }
 
     public isHeavyAttackPressed(): boolean {
         return Phaser.Input.Keyboard.JustDown(this.heavyAttack);
@@ -80,7 +73,7 @@ export class InputManager {
     // Combined input state for network synchronization
     public getInput(): any {
         const hasMovement = this.isLeftPressed() || this.isRightPressed() || this.isUpPressed() || this.isDownPressed();
-        const hasAttack = this.isLightAttackPressed() || this.isHeavyAttackPressed() || this.isSpecialAttackPressed();
+        const hasAttack = this.isHeavyAttackPressed() || this.isSpecialAttackPressed();
         
         // Only return input state if there's actual input to avoid spam
         if (!hasMovement && !hasAttack) {
@@ -94,8 +87,7 @@ export class InputManager {
             up: this.isUpPressed(),
             down: this.isDownPressed(),
             
-            // Attacks  
-            light: this.isLightAttackPressed(),
+            // Attacks
             heavy: this.isHeavyAttackPressed(),
             special: this.isSpecialAttackPressed(),
         };

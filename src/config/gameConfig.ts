@@ -58,8 +58,8 @@ export const GAME_CONFIG = {
         ACTIVE_FRAME_END: 15,
         RANGES: {
             LIGHT: 40,
-            HEAVY: 60,
-            SPECIAL: 80,
+            HEAVY: 140, // Increased to reach AI at 132px+ distance
+            SPECIAL: 160, // Increased for longer range strategic play
         },
         HIT_CLEAR_DELAY: 600, // ms
     },
@@ -69,6 +69,7 @@ export const GAME_CONFIG = {
         ENABLE_NETWORK_LOGGING: false, // Set to false to reduce network spam
         ENABLE_INPUT_LOGGING: false, // Set to true for input debugging
         LOG_INTERPOLATION: false, // Set to true for interpolation debugging
+        ENABLE_HITBOX_DEBUG: false, // Set to false to hide hitbox visualization
     },
     ANIMATION: {
         SPRITE_SIZE: 100, // 100x100 pixels per frame

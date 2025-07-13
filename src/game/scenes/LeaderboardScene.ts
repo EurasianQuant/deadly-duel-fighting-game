@@ -14,7 +14,9 @@ import {
     SurvivalEntry,
     TimeAttackEntry,
     TournamentEntry,
+    LeaderboardData,
 } from "@/services/hybridLeaderboardService";
+import type { LeaderboardEntry } from "@/types/game";
 import { solanaWalletService } from "@/services/solanaWalletService";
 import { supabaseService } from "@/services/supabaseService";
 
@@ -868,7 +870,7 @@ export class LeaderboardScene extends Phaser.Scene {
         }
     }
 
-    private applyPlayerFilter(entries: any[]): any[] {
+    private applyPlayerFilter(entries: LeaderboardEntry[]): LeaderboardEntry[] {
         switch (this.playerFilter) {
             case "global":
                 return entries.filter(entry => entry.isGlobal);
@@ -880,7 +882,7 @@ export class LeaderboardScene extends Phaser.Scene {
         }
     }
 
-    private getSurvivalEntries(leaderboardData: any): SurvivalEntry[] {
+    private getSurvivalEntries(leaderboardData: LeaderboardData): SurvivalEntry[] {
         if (this.selectedCharacter === "all") {
             return leaderboardData.survival[this.currentPeriod] || [];
         } else {
@@ -891,7 +893,7 @@ export class LeaderboardScene extends Phaser.Scene {
         }
     }
 
-    private getTimeAttackEntries(leaderboardData: any): TimeAttackEntry[] {
+    private getTimeAttackEntries(leaderboardData: LeaderboardData): TimeAttackEntry[] {
         let entries: TimeAttackEntry[] = [];
 
         if (this.selectedCharacter === "all") {
@@ -901,10 +903,7 @@ export class LeaderboardScene extends Phaser.Scene {
                     leaderboardData.timeAttack[this.currentPeriod]
                 ).flat() as TimeAttackEntry[];
             } else {
-                entries =
-                    leaderboardData.timeAttack[this.currentPeriod][
-                        this.selectedCourse
-                    ] || [];
+                entries = (leaderboardData.timeAttack[this.currentPeriod] as any)?.[this.selectedCourse] || [];
             }
         } else {
             entries = (
@@ -921,7 +920,7 @@ export class LeaderboardScene extends Phaser.Scene {
         return entries.sort((a, b) => a.completionTime - b.completionTime);
     }
 
-    private getTournamentEntries(leaderboardData: any): TournamentEntry[] {
+    private getTournamentEntries(leaderboardData: LeaderboardData): TournamentEntry[] {
         if (this.selectedCharacter === "all") {
             return leaderboardData.tournament[this.currentPeriod] || [];
         } else {
@@ -1032,22 +1031,26 @@ export class LeaderboardScene extends Phaser.Scene {
         return `${index + 1}.`;
     }
 
-    private getModeSpecificText(entry: any): string {
+    private getModeSpecificText(entry: SurvivalEntry | TimeAttackEntry | TournamentEntry): string {
         switch (this.currentMode) {
-            case "survival":
+            case "survival": {
+                const survivalEntry = entry as SurvivalEntry;
                 return `${hybridLeaderboardService.formatScore(
-                    entry.score
-                )} (R${entry.roundsCompleted})`;
+                    survivalEntry.score
+                )} (R${survivalEntry.roundsCompleted})`;
+            }
             case "timeattack": {
-                const medal = this.getMedalEmoji(entry.medal);
-                return `${medal} ${hybridLeaderboardService.formatTime(
-                    entry.completionTime
+                const timeAttackEntry = entry as TimeAttackEntry;
+                return `${this.getMedalEmoji(timeAttackEntry.medal)} ${hybridLeaderboardService.formatTime(
+                    timeAttackEntry.completionTime
                 )}`;
             }
-            case "tournament":
-                return entry.completed
+            case "tournament": {
+                const tournamentEntry = entry as TournamentEntry;
+                return tournamentEntry.completed
                     ? "👑 CHAMPION"
-                    : `${entry.matchesWon}/${entry.totalMatches} wins`;
+                    : `${tournamentEntry.matchesWon}/${tournamentEntry.totalMatches} wins`;
+            }
             default:
                 return "";
         }

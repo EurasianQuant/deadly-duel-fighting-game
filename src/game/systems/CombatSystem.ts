@@ -74,14 +74,12 @@ export class CombatSystem {
         const stats = fighter.getCharacterStats();
 
         switch (attackType) {
-            case "light":
-                return stats.lightDamage || GAME_CONFIG.COMBAT.LIGHT_DAMAGE;
             case "heavy":
                 return stats.heavyDamage || GAME_CONFIG.COMBAT.HEAVY_DAMAGE;
             case "special":
                 return stats.specialDamage || GAME_CONFIG.COMBAT.SPECIAL_DAMAGE;
             default:
-                return GAME_CONFIG.COMBAT.LIGHT_DAMAGE;
+                return GAME_CONFIG.COMBAT.HEAVY_DAMAGE;
         }
     }
 

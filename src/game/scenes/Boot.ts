@@ -123,6 +123,96 @@ export class Boot extends Scene {
             console.warn('Background assets not found, using fallbacks');
         }
 
+        // Load sound effects - comprehensive format and path testing
+        console.log('🔊 Loading sound effects...');
+        console.log('🔊 Testing multiple formats and paths for punch sound...');
+        
+        // Test if we can access the MP3 file via fetch first
+        fetch('assets/sound/punch.mp3')
+            .then(response => {
+                console.log('🔊 FETCH TEST: punch.mp3 accessibility:', response.ok ? '✅ Accessible' : '❌ Not accessible');
+                console.log('🔊 FETCH DETAILS:', { status: response.status, url: response.url, size: response.headers.get('content-length') });
+                
+                // Also test if it's a valid audio file
+                return response.blob();
+            })
+            .then(blob => {
+                console.log('🔊 FILE TEST:', { 
+                    size: blob.size, 
+                    type: blob.type,
+                    validAudio: blob.type.includes('audio')
+                });
+            })
+            .catch(error => {
+                console.error('❌ FETCH TEST FAILED:', error);
+                console.log('💡 SUGGESTION: Try putting punch.mp3 directly in public/ folder instead of public/assets/sound/');
+            });
+        
+        // Load the MP3 sound file with explicit configuration
+        try {
+            console.log('🔊 Loading punch.mp3...');
+            
+            // Try multiple approaches
+            this.load.audio({
+                key: 'punch',
+                url: 'assets/sound/punch.mp3'
+            });
+            
+            console.log('🔊 Sound loading initiated for: punch.mp3');
+        } catch (loadError) {
+            console.error('❌ Sound loading failed:', loadError);
+            
+            // Fallback: try direct URL
+            try {
+                console.log('🔊 Trying alternative loading method...');
+                this.load.audio('punch', ['assets/sound/punch.mp3']);
+            } catch (fallbackError) {
+                console.error('❌ Fallback loading also failed:', fallbackError);
+            }
+        }
+        
+        // Enhanced error handling for sound files
+        this.load.on('filecomplete-audio-punch', (key: string, type: string, data: any) => {
+            console.log('✅ SUCCESS: Punch sound loaded successfully', { key, type });
+        });
+        
+        this.load.on('filecomplete-audio-special-attack', (key: string, type: string, data: any) => {
+            console.log('✅ SUCCESS: Special attack sound loaded successfully', { key, type });
+        });
+        
+        this.load.on('filecomplete', (key: string, type: string, data: any) => {
+            if (type === 'audio') {
+                console.log(`🔊 AUDIO LOADED: ${key} (${type})`);
+            }
+        });
+        
+        this.load.on('loaderror', (file: any) => {
+            console.error(`❌ LOAD ERROR: ${file.type} file failed:`, {
+                key: file.key,
+                src: file.src,
+                type: file.type,
+                url: file.url,
+                xhr: file.xhr
+            });
+            if (file.type === 'audio') {
+                console.error(`❌ AUDIO LOAD FAILED: ${file.key}`);
+                console.error('📄 File details:', {
+                    attemptedSrc: file.src,
+                    fullUrl: file.url,
+                    httpStatus: file.xhr?.status,
+                    httpStatusText: file.xhr?.statusText
+                });
+                console.warn('Will use procedural fallback sounds during gameplay');
+            }
+        });
+
+        // Also listen for any successful loads
+        this.load.on('filecomplete', (key: string, type: string, data: any) => {
+            if (type === 'audio') {
+                console.log(`✅ AUDIO LOADED: ${key} (${type}) successfully loaded`);
+            }
+        });
+
         // Set loading progress feedback
         this.load.on("progress", (value: number) => {
             console.log(`Boot Scene Loading: ${Math.round(value * 100)}%`);
@@ -131,6 +221,27 @@ export class Boot extends Scene {
 
     create() {
         console.log("BootScene: All assets loaded, starting TitleScene");
+        
+        // Check sound loading status with detailed debugging
+        console.log('🔊 SOUND VERIFICATION:');
+        const punchSound = this.sound.get('punch');
+        const specialSound = this.sound.get('special-attack');
+        
+        console.log('📋 Sound Manager State:', {
+            punchLoaded: !!punchSound,
+            specialLoaded: !!specialSound,
+            soundManagerType: this.sound.constructor.name,
+            soundManager: this.sound
+        });
+        
+        // Just check if the sound is loaded (don't play it yet due to browser policies)
+        if (punchSound) {
+            console.log('✅ PUNCH SOUND: Successfully loaded and cached');
+        } else {
+            console.error('❌ PUNCH SOUND: Failed to load - will use procedural fallbacks');
+            console.log('🔧 DEBUGGING: Check if assets/sound/punch.mp3 exists and is accessible');
+            console.log('🔧 DEBUGGING: Also check browser console for FETCH TEST and LOAD ERROR messages');
+        }
         
         // Ensure textures are properly initialized before starting next scene
         this.time.delayedCall(100, () => {

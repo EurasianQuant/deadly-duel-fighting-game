@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from "react";
-import EventBus from "@/lib/EventBus";
 
 interface PauseOverlayProps {
   isVisible: boolean;

@@ -16,7 +16,7 @@ export type FighterState =
     | "attacking"
     | "hurt"
     | "defeated";
-export type AttackType = "light" | "heavy" | "special";
+export type AttackType = "heavy" | "special";
 
 export class Fighter extends Physics.Arcade.Sprite {
     public health: number;
@@ -34,6 +34,10 @@ export class Fighter extends Physics.Arcade.Sprite {
 
     // Character-specific stats
     private characterStats: Character["stats"];
+    
+    // Debug visual elements
+    private hitboxDebugGraphics?: Phaser.GameObjects.Graphics;
+    private hurtboxDebugGraphics?: Phaser.GameObjects.Graphics;
 
     // Combat properties
     private isAttacking: boolean = false;
@@ -65,7 +69,6 @@ export class Fighter extends Physics.Arcade.Sprite {
             health: GAME_CONFIG.COMBAT.MAX_HEALTH,
             speed: GAME_CONFIG.PHYSICS.PLAYER_SPEED,
             jumpVelocity: GAME_CONFIG.PHYSICS.JUMP_VELOCITY,
-            lightDamage: GAME_CONFIG.COMBAT.LIGHT_DAMAGE,
             heavyDamage: GAME_CONFIG.COMBAT.HEAVY_DAMAGE,
             specialDamage: GAME_CONFIG.COMBAT.SPECIAL_DAMAGE,
             attackSpeed: 1.0,
@@ -97,6 +100,9 @@ export class Fighter extends Physics.Arcade.Sprite {
 
         // Create basic animations
         this.createAnimations();
+        
+        // Create debug graphics (initially hidden)
+        this.createDebugGraphics();
     }
 
     public update(delta: number): void {
@@ -107,6 +113,7 @@ export class Fighter extends Physics.Arcade.Sprite {
         
         this.updateCombatTimers(delta);
         this.updateAnimationState();
+        this.updateDebugVisuals();
     }
 
     public move(direction: "left" | "right"): void {
@@ -236,6 +243,11 @@ export class Fighter extends Physics.Arcade.Sprite {
         }
 
         this.health = Math.max(0, this.health - amount);
+        
+        // Ensure health is exactly 0 when it should be defeated (prevent floating point issues)
+        if (this.health < 0.01) {
+            this.health = 0;
+        }
 
         // Set hurt state - but be smarter about preserving jump physics
         const wasJumpingOrFalling = this.currentState === "jumping" || this.currentState === "falling";
@@ -278,6 +290,7 @@ export class Fighter extends Physics.Arcade.Sprite {
 
         // Check if fighter is defeated
         if (this.health <= 0) {
+            console.log(`💀 HEALTH ZERO: ${this.fighterName} health reached ${this.health}, calling onDefeated()`);
             this.onDefeated();
         }
     }
@@ -390,7 +403,7 @@ export class Fighter extends Physics.Arcade.Sprite {
 
     private updateAnimationState(): void {
         // Safety check: Don't update animations if the fighter or animation system is invalid
-        if (!this.anims || !this.anims.animationManager || (this.currentState as any) === "defeated") {
+        if (!this.anims || !this.anims.animationManager) {
             return;
         }
         
@@ -543,17 +556,6 @@ export class Fighter extends Physics.Arcade.Sprite {
             });
         }
 
-        if (!this.anims.exists("lightAttack")) {
-            this.anims.create({
-                key: "lightAttack",
-                frames: this.anims.generateFrameNumbers(textureKey, {
-                    start: 16,
-                    end: 17,
-                }), // First 2 frames of ATTACK1
-                frameRate: 16,
-                repeat: 0,
-            });
-        }
 
         if (!this.anims.exists("heavyAttack")) {
             this.anims.create({
@@ -592,6 +594,7 @@ export class Fighter extends Physics.Arcade.Sprite {
         }
 
         if (!this.anims.exists("death")) {
+            console.log(`💀 CREATING DEATH ANIM: ${this.fighterName} creating death animation frames 28-31`);
             this.anims.create({
                 key: "death",
                 frames: this.anims.generateFrameNumbers(textureKey, {
@@ -601,6 +604,7 @@ export class Fighter extends Physics.Arcade.Sprite {
                 frameRate: 8,
                 repeat: 0,
             });
+            console.log(`💀 DEATH ANIM CREATED: ${this.fighterName} death animation created successfully`);
         }
 
         // Start with idle animation and lock it
@@ -611,7 +615,8 @@ export class Fighter extends Physics.Arcade.Sprite {
     private safePlay(animationKey: string, ignoreIfPlaying?: boolean): void {
         try {
             // Check if animation system is valid
-            if (!this.anims || !this.anims.animationManager || (this.currentState as any) === "defeated") {
+            if (!this.anims || !this.anims.animationManager) {
+                console.warn(`Animation system invalid for ${this.fighterName} when trying to play ${animationKey}`);
                 return;
             }
             
@@ -621,8 +626,17 @@ export class Fighter extends Physics.Arcade.Sprite {
                 return;
             }
             
+            // Special handling for death animation
+            if (animationKey === "death") {
+                console.log(`💀 PLAYING DEATH: ${this.fighterName} attempting to play death animation`);
+            }
+            
             // Play the animation safely
             this.play(animationKey, ignoreIfPlaying);
+            
+            if (animationKey === "death") {
+                console.log(`💀 DEATH STARTED: ${this.fighterName} death animation should now be playing`);
+            }
         } catch (error) {
             console.error(`Failed to play animation '${animationKey}' for fighter ${this.fighterName}:`, error);
         }
@@ -631,14 +645,12 @@ export class Fighter extends Physics.Arcade.Sprite {
     private getAttackFrames(type: AttackType): number {
         const baseFrames = (() => {
             switch (type) {
-                case "light":
-                    return GAME_CONFIG.ATTACK.FRAMES.LIGHT;
                 case "heavy":
                     return GAME_CONFIG.ATTACK.FRAMES.HEAVY;
                 case "special":
                     return GAME_CONFIG.ATTACK.FRAMES.SPECIAL;
                 default:
-                    return GAME_CONFIG.ATTACK.FRAMES.LIGHT;
+                    return GAME_CONFIG.ATTACK.FRAMES.HEAVY;
             }
         })();
 
@@ -652,8 +664,6 @@ export class Fighter extends Physics.Arcade.Sprite {
         if (!this.attackType) return 0;
 
         switch (this.attackType) {
-            case "light":
-                return GAME_CONFIG.ATTACK.RANGES.LIGHT;
             case "heavy":
                 return GAME_CONFIG.ATTACK.RANGES.HEAVY;
             case "special":
@@ -665,8 +675,6 @@ export class Fighter extends Physics.Arcade.Sprite {
 
     private getAttackDamage(type: AttackType): number {
         switch (type) {
-            case "light":
-                return this.characterStats.lightDamage;
             case "heavy":
                 return this.characterStats.heavyDamage;
             case "special":
@@ -687,6 +695,10 @@ export class Fighter extends Physics.Arcade.Sprite {
         body.setVelocity(0);
         body.setAcceleration(0);
 
+        // Immediately play death animation
+        console.log(`💀 DEATH: ${this.fighterName} playing death animation`);
+        this.safePlay("death", false);
+        
         // Emit defeat event
         EventBus.emit("fighter-defeated", {
             fighter: this.fighterName,
@@ -739,59 +751,251 @@ export class Fighter extends Physics.Arcade.Sprite {
     }
 
     private playHitSound(damage: number): void {
-        // Determine hit sound based on damage amount
-        let soundKey = 'hit-light';
+        // Use actual sound files for combat sounds - simplified to just punch for now
+        const soundKey = 'punch'; // Use punch sound for all attacks until we get it working
         
-        if (damage >= GAME_CONFIG.COMBAT.HEAVY_DAMAGE) {
-            soundKey = 'hit-heavy';
-        } else if (damage >= GAME_CONFIG.COMBAT.SPECIAL_DAMAGE) {
-            soundKey = 'hit-special';
-        }
+        console.log(`🔊 COMBAT SOUND: Attempting to play ${soundKey} for ${damage} damage`);
         
-        // Try to play the sound if it exists, otherwise create a basic hit sound
+        // Try to play the preloaded sound file - MULTIPLE ATTEMPTS
         try {
-            if (this.scene.sound.get(soundKey)) {
-                this.scene.sound.play(soundKey, { volume: 0.7 });
-            } else {
-                // Fallback: create a basic hit sound using Phaser's Web Audio API
-                this.createHitSound(damage);
+            const soundManager = this.scene.sound;
+            
+            // Method 1: Try direct play first (most reliable)
+            try {
+                console.log(`🔊 METHOD 1: Direct play attempt for '${soundKey}'`);
+                soundManager.play(soundKey, { volume: 0.8 });
+                console.log(`✅ SUCCESS: Sound played directly - ${soundKey}`);
+                return; // SUCCESS - exit without procedural sound
+            } catch (directError) {
+                console.warn(`❌ METHOD 1 FAILED:`, directError);
             }
+            
+            // Method 2: Check if sound exists in cache
+            const sound = soundManager.get(soundKey);
+            console.log(`🔊 METHOD 2: Cache check. Sound found:`, !!sound);
+            
+            const soundExists = !!sound;
+            
+            if (sound || soundExists) {
+                console.log(`🔊 METHOD 2: Found in cache, attempting play...`);
+                soundManager.play(soundKey, { volume: 0.8 });
+                console.log(`✅ SUCCESS: Sound played from cache - ${soundKey}`);
+                return; // SUCCESS - exit without procedural sound
+            }
+            
+            console.warn(`❌ METHOD 2: Sound '${soundKey}' not in cache`);
+            
         } catch (error) {
-            // Fallback to basic hit sound creation
-            this.createHitSound(damage);
+            console.error(`❌ All sound methods failed for '${soundKey}':`, error);
         }
         
-        debug.general(`Hit sound played: ${soundKey} for ${damage} damage`);
+        // Only create procedural sound if file sound failed
+        console.log(`🔊 FALLBACK: Creating procedural ${damage >= GAME_CONFIG.COMBAT.SPECIAL_DAMAGE ? 'special' : 'heavy'} sound`);
+        this.createCombatSound(damage);
     }
 
-    private createHitSound(damage: number): void {
-        // Create a basic hit sound effect using Web Audio API
+    private createCombatSound(damage: number): void {
+        // Create retro fighting game sounds based on damage type
         try {
             const audioContext = (this.scene.sound as any).context;
             if (!audioContext) return;
             
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
+            const isSpecialAttack = damage >= GAME_CONFIG.COMBAT.SPECIAL_DAMAGE;
             
-            // Configure sound based on damage
-            const frequency = damage >= GAME_CONFIG.COMBAT.HEAVY_DAMAGE ? 150 : 
-                            damage >= GAME_CONFIG.COMBAT.SPECIAL_DAMAGE ? 200 : 250;
-            const duration = damage >= GAME_CONFIG.COMBAT.HEAVY_DAMAGE ? 0.15 : 0.1;
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-            oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.5, audioContext.currentTime + duration);
-            
-            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-            
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + duration);
+            if (isSpecialAttack) {
+                // Special attack = Street Fighter style "Hadouken" energy sound
+                this.createRetroSpecialSound(audioContext);
+            } else {
+                // Heavy attack = Classic arcade punch sound
+                this.createRetroPunchSound(audioContext);
+            }
             
         } catch (error) {
-            console.warn('Could not create hit sound effect:', error);
+            console.warn('Could not create retro combat sound effect:', error);
+        }
+    }
+
+    private createRetroPunchSound(audioContext: AudioContext): void {
+        // Create classic arcade punch sound like Street Fighter
+        const oscillator1 = audioContext.createOscillator();
+        const oscillator2 = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        const filter = audioContext.createBiquadFilter();
+        
+        // Classic arcade punch - dual tone with quick frequency drop
+        oscillator1.frequency.setValueAtTime(220, audioContext.currentTime); // Low punch thud
+        oscillator1.frequency.exponentialRampToValueAtTime(60, audioContext.currentTime + 0.08);
+        oscillator1.type = 'square'; // Retro square wave
+        
+        // High frequency click for impact
+        oscillator2.frequency.setValueAtTime(1200, audioContext.currentTime);
+        oscillator2.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.04);
+        oscillator2.type = 'triangle';
+        
+        // Slight low-pass for arcade character
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(2000, audioContext.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.08);
+        
+        // Connect retro punch graph
+        oscillator1.connect(filter);
+        oscillator2.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        // Classic arcade envelope - sharp attack, quick decay
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.005); // Very sharp attack
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.08); // Quick fade
+        
+        oscillator1.start(audioContext.currentTime);
+        oscillator2.start(audioContext.currentTime);
+        oscillator1.stop(audioContext.currentTime + 0.08);
+        oscillator2.stop(audioContext.currentTime + 0.04);
+    }
+
+    private createRetroSpecialSound(audioContext: AudioContext): void {
+        // Create classic "Hadouken" style energy projectile sound
+        const oscillator1 = audioContext.createOscillator();
+        const oscillator2 = audioContext.createOscillator();
+        const oscillator3 = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        const filter = audioContext.createBiquadFilter();
+        
+        // Main energy frequency - sweeping upward like charging energy
+        oscillator1.frequency.setValueAtTime(150, audioContext.currentTime);
+        oscillator1.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.15);
+        oscillator1.type = 'sawtooth'; // Classic retro wave
+        
+        // Harmonic frequency for richness
+        oscillator2.frequency.setValueAtTime(300, audioContext.currentTime);
+        oscillator2.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.15);
+        oscillator2.type = 'square';
+        
+        // High frequency sparkle for energy effect
+        oscillator3.frequency.setValueAtTime(1000, audioContext.currentTime);
+        oscillator3.frequency.exponentialRampToValueAtTime(2000, audioContext.currentTime + 0.1);
+        oscillator3.type = 'triangle';
+        
+        // Band-pass filter for that classic arcade energy sound
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(500, audioContext.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(1200, audioContext.currentTime + 0.15);
+        filter.Q.setValueAtTime(8, audioContext.currentTime); // Resonant for energy effect
+        
+        // Connect energy sound graph
+        oscillator1.connect(filter);
+        oscillator2.connect(filter);
+        oscillator3.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        // Energy charge envelope - builds up then releases
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+        gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.02); // Initial charge
+        gainNode.gain.linearRampToValueAtTime(0.25, audioContext.currentTime + 0.08); // Build energy
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.18); // Release
+        
+        oscillator1.start(audioContext.currentTime);
+        oscillator2.start(audioContext.currentTime);
+        oscillator3.start(audioContext.currentTime);
+        oscillator1.stop(audioContext.currentTime + 0.18);
+        oscillator2.stop(audioContext.currentTime + 0.18);
+        oscillator3.stop(audioContext.currentTime + 0.12);
+    }
+
+    private createDebugGraphics(): void {
+        // Create graphics objects for debug visualization
+        this.hitboxDebugGraphics = this.scene.add.graphics();
+        this.hurtboxDebugGraphics = this.scene.add.graphics();
+        
+        // Set high depth so they appear on top
+        this.hitboxDebugGraphics.setDepth(1000);
+        this.hurtboxDebugGraphics.setDepth(1000);
+        
+        // Initially hidden
+        this.hitboxDebugGraphics.setVisible(false);
+        this.hurtboxDebugGraphics.setVisible(false);
+    }
+
+    private updateDebugVisuals(): void {
+        if (!this.hitboxDebugGraphics || !this.hurtboxDebugGraphics) return;
+        
+        // Check if debug mode is enabled (you can control this via game config or key press)
+        const debugEnabled = GAME_CONFIG.DEBUG.ENABLE_HITBOX_DEBUG || false;
+        
+        if (!debugEnabled) {
+            this.hitboxDebugGraphics.setVisible(false);
+            this.hurtboxDebugGraphics.setVisible(false);
+            return;
+        }
+        
+        // Clear previous drawings
+        this.hitboxDebugGraphics.clear();
+        this.hurtboxDebugGraphics.clear();
+        
+        // Draw hurtbox (fighter's body collision area) - Purple
+        const fighterBounds = this.getBounds();
+        this.hurtboxDebugGraphics.lineStyle(2, 0x8A2BE2, 1); // Purple
+        this.hurtboxDebugGraphics.strokeRect(
+            fighterBounds.x, 
+            fighterBounds.y, 
+            fighterBounds.width, 
+            fighterBounds.height
+        );
+        
+        // Draw attack hitbox when attacking - Red
+        if (this.isAttacking) {
+            const hitbox = this.getAttackHitbox();
+            if (hitbox.width > 0 && hitbox.height > 0) {
+                this.hitboxDebugGraphics.lineStyle(3, 0xFF0000, 0.8); // Red, semi-transparent
+                this.hitboxDebugGraphics.fillStyle(0xFF0000, 0.2); // Red fill, very transparent
+                this.hitboxDebugGraphics.fillRect(hitbox.x, hitbox.y, hitbox.width, hitbox.height);
+                this.hitboxDebugGraphics.strokeRect(hitbox.x, hitbox.y, hitbox.width, hitbox.height);
+                
+                // Add text label for attack type and range
+                const labelText = `${this.attackType?.toUpperCase()} (${hitbox.width}px)`;
+                const textStyle = {
+                    fontSize: '16px',
+                    fill: '#FFFFFF',
+                    backgroundColor: '#000000',
+                    padding: { x: 4, y: 2 }
+                };
+                
+                // Remove old text if exists
+                const existingText = this.scene.children.getByName(`${this.fighterName}_hitbox_label`);
+                if (existingText) {
+                    existingText.destroy();
+                }
+                
+                const debugText = this.scene.add.text(
+                    hitbox.x, 
+                    hitbox.y - 25, 
+                    labelText, 
+                    textStyle
+                );
+                debugText.setName(`${this.fighterName}_hitbox_label`);
+                debugText.setDepth(1001);
+                
+                // Auto-remove text after a short delay
+                this.scene.time.delayedCall(200, () => {
+                    if (debugText && debugText.active) {
+                        debugText.destroy();
+                    }
+                });
+            }
+        }
+        
+        this.hitboxDebugGraphics.setVisible(true);
+        this.hurtboxDebugGraphics.setVisible(true);
+    }
+
+    public toggleHitboxDebug(): void {
+        // Method to toggle debug visuals (can be called externally)
+        if (this.hitboxDebugGraphics && this.hurtboxDebugGraphics) {
+            const currentlyVisible = this.hitboxDebugGraphics.visible;
+            this.hitboxDebugGraphics.setVisible(!currentlyVisible);
+            this.hurtboxDebugGraphics.setVisible(!currentlyVisible);
         }
     }
 

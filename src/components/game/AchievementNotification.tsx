@@ -37,10 +37,10 @@ export const AchievementNotification: React.FC = () => {
             }, 5500);
         };
 
-        (EventBus as any).on("achievement-unlocked", handleAchievementUnlocked);
+        EventBus.on("achievement-unlocked", handleAchievementUnlocked);
 
         return () => {
-            (EventBus as any).off("achievement-unlocked", handleAchievementUnlocked);
+            EventBus.off("achievement-unlocked", handleAchievementUnlocked);
         };
     }, []);
 

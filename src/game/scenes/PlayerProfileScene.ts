@@ -261,13 +261,51 @@ export class PlayerProfileScene extends Phaser.Scene {
         this.isEditingUsername = true;
         
         // Create a simple prompt for username (since we can't use HTML input in Phaser)
-        const newUsername = prompt('Enter new username (3-20 characters):');
+        const newUsername = prompt('Enter new username (3-20 characters, alphanumeric only):');
         
-        if (newUsername && newUsername.length >= 3 && newUsername.length <= 20) {
+        if (newUsername && this.validateUsername(newUsername)) {
             this.updateUsername(newUsername);
+        } else if (newUsername) {
+            // Show validation error
+            const errorText = this.add.text(this.cameras.main.width / 2, 350, "Invalid username! Use 3-20 alphanumeric characters only.", {
+                fontFamily: "Press Start 2P",
+                fontSize: "10px",
+                color: "#EF4444"
+            });
+            errorText.setOrigin(0.5);
+            
+            // Remove error message after 3 seconds
+            this.tweens.add({
+                targets: errorText,
+                alpha: 0,
+                duration: 3000,
+                onComplete: () => errorText.destroy()
+            });
         }
         
         this.isEditingUsername = false;
+    }
+
+    private validateUsername(username: string): boolean {
+        // Check length
+        if (username.length < 3 || username.length > 20) {
+            return false;
+        }
+        
+        // Check for alphanumeric characters only (including underscores)
+        const alphanumericPattern = /^[a-zA-Z0-9_]+$/;
+        if (!alphanumericPattern.test(username)) {
+            return false;
+        }
+        
+        // Check for prohibited words/patterns
+        const prohibitedWords = ['admin', 'moderator', 'system', 'bot', 'null', 'undefined'];
+        const lowerUsername = username.toLowerCase();
+        if (prohibitedWords.some(word => lowerUsername.includes(word))) {
+            return false;
+        }
+        
+        return true;
     }
 
     private async updateUsername(newUsername: string): Promise<void> {

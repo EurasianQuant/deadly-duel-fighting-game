@@ -910,13 +910,14 @@ export class HybridLeaderboardService {
             case 'timeAttack':
                 entries = this.getTimeAttackLeaderboard(period, undefined, character);
                 break;
-            case 'tournament':
+            case 'tournament': {
                 const data = this.getLeaderboardData();
                 if (character) {
                     entries = data.tournament.perCharacter[character] || [];
                 } else {
                     entries = data.tournament[period] || [];
                 }
+            }
                 break;
         }
 

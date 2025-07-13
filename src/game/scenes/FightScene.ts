@@ -115,10 +115,13 @@ export class FightScene extends Scene {
         this.player1.update(delta);
         this.player2.update(delta);
 
-        // Update UI with health changes directly via EventBus
+        // Update UI with health changes directly via EventBus (ensure 0 health precision)
+        const player1Health = this.player1.health < 0.01 ? 0 : this.player1.health;
+        const player2Health = this.player2.health < 0.01 ? 0 : this.player2.health;
+        
         EventBus.emit("health-update", {
-            player1: { health: this.player1.health, maxHealth: this.player1.maxHealth, name: this.player1.characterId },
-            player2: { health: this.player2.health, maxHealth: this.player2.maxHealth, name: this.player2.characterId }
+            player1: { health: player1Health, maxHealth: this.player1.maxHealth, name: this.player1.characterId },
+            player2: { health: player2Health, maxHealth: this.player2.maxHealth, name: this.player2.characterId }
         });
         
         // Update game store for React HUD
@@ -218,16 +221,29 @@ export class FightScene extends Scene {
         // Flip player 2 to face left
         this.player2.setFlipX(true);
         
+        // Ensure both fighters start with full health (important for round restarts)
+        this.player1.health = this.player1.maxHealth;
+        this.player2.health = this.player2.maxHealth;
+        
+        console.log(`💚 HEALTH RESET: Fighter health reset - Player1: ${this.player1.health}/${this.player1.maxHealth}, Player2: ${this.player2.health}/${this.player2.maxHealth}`);
+        
         debug.general(`Fighters created: ${selectedCharacter.name} vs ${aiOpponent.name}`);
     }
 
     private setupGameStore(): void {
         const gameStore = useGameStore.getState();
         
-        // Add players to store
+        // Clear any existing players to prevent health persistence from previous matches
+        gameStore.removePlayer("player1");
+        gameStore.removePlayer("player2");
+        
+        // Force clean state
+        gameStore.resetMatch();
+        
+        // Add players to store with fresh health values
         gameStore.addPlayer({
             id: "player1",
-            health: this.player1.health,
+            health: this.player1.maxHealth, // Ensure full health
             maxHealth: this.player1.maxHealth,
             name: this.player1.fighterName,
             x: this.player1.x,
@@ -240,7 +256,7 @@ export class FightScene extends Scene {
         
         gameStore.addPlayer({
             id: "player2",
-            health: this.player2.health,
+            health: this.player2.maxHealth, // Ensure full health
             maxHealth: this.player2.maxHealth,
             name: this.player2.fighterName,
             x: this.player2.x,
@@ -276,15 +292,19 @@ export class FightScene extends Scene {
     private updateGameStore(): void {
         const gameStore = useGameStore.getState();
         
+        // Ensure health precision for UI display (force 0 when health is very low)
+        const player1Health = this.player1.health < 0.01 ? 0 : this.player1.health;
+        const player2Health = this.player2.health < 0.01 ? 0 : this.player2.health;
+        
         // Update player health
         gameStore.updatePlayer("player1", {
-            health: this.player1.health,
+            health: player1Health,
             x: this.player1.x,
             y: this.player1.y
         });
         
         gameStore.updatePlayer("player2", {
-            health: this.player2.health,
+            health: player2Health,
             x: this.player2.x,
             y: this.player2.y
         });
@@ -345,9 +365,6 @@ export class FightScene extends Scene {
         }
 
         // Attacks
-        if (this.inputManager.isLightAttackPressed()) {
-            this.player1.attack("light");
-        }
 
         if (this.inputManager.isHeavyAttackPressed()) {
             this.player1.attack("heavy");
@@ -428,7 +445,7 @@ export class FightScene extends Scene {
         this.gameStarted = true;
         this.countdownText.setVisible(false);
         
-        debug.general("Fight started! Use WASD to move, JKL to attack");
+        debug.general("Fight started! Use WASD to move, K/L to attack, H to toggle hitbox debug");
     }
 
     private setupPauseHandling(): void {
@@ -439,9 +456,20 @@ export class FightScene extends Scene {
                 gamePauseService.pauseGame(gameMode, this);
             }
         });
+        
+        // Listen for H key to toggle hitbox debug
+        this.input.keyboard!.on("keydown-H", () => {
+            this.player1.toggleHitboxDebug();
+            this.player2.toggleHitboxDebug();
+        });
     }
 
     shutdown(): void {
+        // Clean up game store to prevent health persistence
+        const gameStore = useGameStore.getState();
+        gameStore.removePlayer("player1");
+        gameStore.removePlayer("player2");
+        
         // Clean up input listeners
         this.input.keyboard!.removeAllListeners();
         

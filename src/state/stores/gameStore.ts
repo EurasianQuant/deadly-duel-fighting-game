@@ -125,15 +125,25 @@ export const useGameStore = create<GameStore>()(
                     }),
 
                 updatePlayer: (playerId, updates) =>
-                    set((state) => ({
-                        players: {
-                            ...state.players,
-                            [playerId]: {
-                                ...state.players[playerId],
-                                ...updates,
+                    set((state) => {
+                        const currentPlayer = state.players[playerId];
+                        if (!currentPlayer) return state;
+                        
+                        // Ensure health is exactly 0 when it should be defeated
+                        const updatedHealth = updates.health !== undefined ? updates.health : currentPlayer.health;
+                        const cleanHealth = updatedHealth < 0.01 ? 0 : updatedHealth;
+                        
+                        return {
+                            players: {
+                                ...state.players,
+                                [playerId]: {
+                                    ...currentPlayer,
+                                    ...updates,
+                                    health: cleanHealth,
+                                },
                             },
-                        },
-                    })),
+                        };
+                    }),
 
                 setLocalPlayer: (playerId) => set({ localPlayerId: playerId }),
 

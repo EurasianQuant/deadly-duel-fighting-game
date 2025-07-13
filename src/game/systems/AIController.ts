@@ -16,7 +16,6 @@ export interface AIBehaviorConfig {
     jumpChance?: number;
     combatJumpChance?: number;
     attackDistribution: {
-        light: number;
         heavy: number;
         special: number;
     };
@@ -37,7 +36,7 @@ export class AIController {
         this.characterBehaviors.set("rocco", {
             baseAggression: GAME_CONFIG.AI.VETERAN_BRAWLER_AGGRESSION,
             preferredRange: 100,
-            attackDistribution: { light: 0.3, heavy: 0.5, special: 0.2 }
+            attackDistribution: { heavy: 0.7, special: 0.3 }
         });
 
         // Kai - Swift Striker: Fast, hit-and-run tactics
@@ -45,14 +44,14 @@ export class AIController {
             baseAggression: GAME_CONFIG.AI.SWIFT_STRIKER_AGGRESSION,
             preferredRange: 80,
             retreatDistance: 60,
-            attackDistribution: { light: 0.6, heavy: 0.2, special: 0.2 }
+            attackDistribution: { heavy: 0.7, special: 0.3 }
         });
 
         // Kestrel - Lethal Blade: Calculated, waits for openings
         this.characterBehaviors.set("kestrel", {
             baseAggression: GAME_CONFIG.AI.LETHAL_BLADE_AGGRESSION,
             preferredRange: 90,
-            attackDistribution: { light: 0.3, heavy: 0.4, special: 0.3 }
+            attackDistribution: { heavy: 0.6, special: 0.4 }
         });
 
         // Zadie - Acrobatic Tempest: Jumpy, unpredictable (reduced jump frequency)
@@ -61,7 +60,7 @@ export class AIController {
             preferredRange: 110,
             jumpChance: 0.1, // Reduced from 0.3 to 0.1 (10% vs 30%)
             combatJumpChance: 0.005, // Reduced from 0.02 to 0.005 (0.5% vs 2%)
-            attackDistribution: { light: 0.4, heavy: 0.3, special: 0.3 }
+            attackDistribution: { heavy: 0.6, special: 0.4 }
         });
 
         // Kael - Mystic Guardian: Defensive, uses specials
@@ -69,14 +68,14 @@ export class AIController {
             baseAggression: GAME_CONFIG.AI.MYSTIC_GUARDIAN_AGGRESSION,
             preferredRange: 130,
             retreatDistance: 70,
-            attackDistribution: { light: 0.3, heavy: 0.2, special: 0.5 }
+            attackDistribution: { heavy: 0.4, special: 0.6 }
         });
 
         // Jin - Shadow Assassin: Evasive, precise strikes
         this.characterBehaviors.set("jin", {
             baseAggression: GAME_CONFIG.AI.SHADOW_ASSASSIN_AGGRESSION,
             preferredRange: 70,
-            attackDistribution: { light: 0.5, heavy: 0.2, special: 0.3 }
+            attackDistribution: { heavy: 0.6, special: 0.4 }
         });
     }
 
@@ -274,7 +273,7 @@ export class AIController {
         }
 
         if (distance < 100 && Math.random() < aggression) {
-            const attackTypes = ["light", "heavy", "special"] as const;
+            const attackTypes = ["heavy", "special"] as const;
             const randomAttack = attackTypes[Math.floor(Math.random() * attackTypes.length)];
             aiFighter.attack(randomAttack);
         }
@@ -302,12 +301,10 @@ export class AIController {
         aiFighter.faceTarget(targetFighter);
     }
 
-    private executeAttack(aiFighter: Fighter, distribution: { light: number; heavy: number; special: number }): void {
+    private executeAttack(aiFighter: Fighter, distribution: { heavy: number; special: number }): void {
         const random = Math.random();
         
-        if (random < distribution.light) {
-            aiFighter.attack("light");
-        } else if (random < distribution.light + distribution.heavy) {
+        if (random < distribution.heavy) {
             aiFighter.attack("heavy");
         } else {
             aiFighter.attack("special");
@@ -318,7 +315,7 @@ export class AIController {
         // Identify character by their unique stat combination
         if (stats.health === 250 && stats.speed === 300) return "fighter_1"; // Rocco
         if (stats.health === 180 && stats.speed === 420) return "fighter_2"; // Kai
-        if (stats.health === 200 && stats.lightDamage === 25) return "fighter_3"; // Kestrel
+        if (stats.health === 190 && stats.heavyDamage === 28) return "fighter_3"; // Kestrel
         if (stats.health === 170 && stats.jumpVelocity === -950) return "fighter_4"; // Zadie
         if (stats.health === 220 && stats.specialDamage === 30) return "fighter_5"; // Kael
         if (stats.health === 160 && stats.speed === 450) return "fighter_6"; // Nyx

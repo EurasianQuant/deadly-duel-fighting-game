@@ -261,6 +261,14 @@ export class TimeAttackScene extends Scene {
                 gamePauseService.pauseGame("timeattack", this);
             }
         });
+        
+        // Listen for H key to toggle hitbox debug
+        this.input.keyboard!.on("keydown-H", () => {
+            this.player.toggleHitboxDebug();
+            if (this.enemy) {
+                this.enemy.toggleHitboxDebug();
+            }
+        });
     }
 
     private createUI(): void {
@@ -834,9 +842,7 @@ export class TimeAttackScene extends Scene {
         }
         
         // Attacks
-        if (this.inputManager.isLightAttackPressed()) {
-            this.player.attack("light");
-        } else if (this.inputManager.isHeavyAttackPressed()) {
+        if (this.inputManager.isHeavyAttackPressed()) {
             this.player.attack("heavy");
         } else if (this.inputManager.isSpecialAttackPressed()) {
             this.player.attack("special");
@@ -894,7 +900,14 @@ export class TimeAttackScene extends Scene {
         // Initialize game store for Time Attack mode
         const gameStore = useGameStore.getState();
         
-        // Add players to store
+        // Clear any existing players to prevent health persistence from previous matches
+        gameStore.removePlayer("player1");
+        gameStore.removePlayer("player2");
+        
+        // Force clean state
+        gameStore.resetMatch();
+        
+        // Add players to store with fresh health values
         gameStore.addPlayer({
             id: "player1",
             health: this.player.health,
@@ -936,8 +949,12 @@ export class TimeAttackScene extends Scene {
     private emitHealthUpdate(): void {
         const gameStore = useGameStore.getState();
         
+        // Ensure health precision for UI display (force 0 when health is very low)
+        const playerHealth = this.player.health < 0.01 ? 0 : this.player.health;
+        const enemyHealth = this.enemy && this.enemy.health < 0.01 ? 0 : (this.enemy ? this.enemy.health : 0);
+        
         const enemyHealthData = this.enemy ? {
-            health: this.enemy.health,
+            health: enemyHealth,
             maxHealth: this.enemy.maxHealth,
             name: `Opponent ${this.timeAttackData.currentOpponentIndex + 1}`
         } : {
@@ -948,7 +965,7 @@ export class TimeAttackScene extends Scene {
 
         // Update players in game store for React HUD
         gameStore.updatePlayer("player1", {
-            health: this.player.health,
+            health: playerHealth,
             maxHealth: this.player.maxHealth,
             name: this.player.fighterName
         });
@@ -968,7 +985,7 @@ export class TimeAttackScene extends Scene {
         // Also emit legacy event for backwards compatibility
         EventBus.emit("health-update", {
             player1: {
-                health: this.player.health,
+                health: playerHealth,
                 maxHealth: this.player.maxHealth,
                 name: this.player.fighterName
             },
@@ -1003,6 +1020,11 @@ export class TimeAttackScene extends Scene {
     }
 
     shutdown(): void {
+        // Clean up game store to prevent health persistence
+        const gameStore = useGameStore.getState();
+        gameStore.removePlayer("player1");
+        gameStore.removePlayer("player2");
+        
         // Clean up fighters to prevent stale references during scene transitions
         if (this.player) {
             this.player.destroy();

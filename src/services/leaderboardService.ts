@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger";
+import { localStorageUtils } from "@/utils/localStorageUtils";
 
 // Core leaderboard entry interfaces
 export interface SurvivalEntry {
@@ -129,7 +130,7 @@ export class LeaderboardService {
     // Player profile management
     public static getPlayerProfile(): PlayerProfile {
         try {
-            const stored = localStorage.getItem(this.STORAGE_KEYS.PLAYER_PROFILE);
+            const stored = localStorageUtils.safeRead(this.STORAGE_KEYS.PLAYER_PROFILE);
             if (stored) {
                 const profile = JSON.parse(stored) as PlayerProfile;
                 // Update last active timestamp
@@ -147,7 +148,7 @@ export class LeaderboardService {
 
     public static savePlayerProfile(profile: PlayerProfile): void {
         try {
-            localStorage.setItem(this.STORAGE_KEYS.PLAYER_PROFILE, JSON.stringify(profile));
+            localStorageUtils.debouncedWriteObject(this.STORAGE_KEYS.PLAYER_PROFILE, profile);
             logger.debug('Player profile saved successfully');
         } catch (error) {
             console.error('Failed to save player profile:', error);
@@ -185,7 +186,7 @@ export class LeaderboardService {
     // Leaderboard data management
     public static getLeaderboardData(): LeaderboardData {
         try {
-            const stored = localStorage.getItem(this.STORAGE_KEYS.LEADERBOARD_DATA);
+            const stored = localStorageUtils.safeRead(this.STORAGE_KEYS.LEADERBOARD_DATA);
             if (stored) {
                 return JSON.parse(stored) as LeaderboardData;
             }
@@ -199,7 +200,7 @@ export class LeaderboardService {
     public static saveLeaderboardData(data: LeaderboardData): void {
         try {
             data.lastUpdated = Date.now();
-            localStorage.setItem(this.STORAGE_KEYS.LEADERBOARD_DATA, JSON.stringify(data));
+            localStorageUtils.debouncedWriteObject(this.STORAGE_KEYS.LEADERBOARD_DATA, data);
         } catch (error) {
             console.error('Failed to save leaderboard data:', error);
         }

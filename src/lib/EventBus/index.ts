@@ -1,12 +1,10 @@
 import Phaser from "phaser";
-import type { Player, GameStateData, AttackData, VFXData } from "@/types/game";
+import type { Player, GameStateData, AttackData, VFXData, GameMode } from "@/types/game";
 
 // Define typed events for the EventBus
 interface GameEvents {
     // Game state events
     "game-started": { mode: string; players: number };
-    "game-paused": { timestamp: number };
-    "game-resumed": { timestamp: number };
     "game-over": { winner: string; finalScore: number };
     "round-started": { round: number };
     "round-ended": { round: number; winner: string; score?: string };
@@ -95,6 +93,23 @@ interface GameEvents {
     "wallet-disconnected": Record<string, never>;
     "show-wallet-connection": Record<string, never>;
     
+    // Game control events
+    "game-paused": { gameMode: GameMode; sceneName?: string };
+    "game-resumed": { gameMode: GameMode | null; sceneName?: string };
+    "game-exit-to-menu": { fromGameMode: GameMode | null; fromScene?: string };
+
+    // Achievement events
+    "achievement-unlocked": { achievement: { id: string; name: string; description: string; icon: string; rarity: 'common' | 'rare' | 'epic' | 'legendary'; reward?: { type: 'title' | 'badge' | 'cosmetic'; value: string; } }; points: number; totalPoints: number };
+    "survival-completed": { roundsCompleted: number; perfectRounds: number };
+    "tournament-completed": { completed: boolean };
+    "timeattack-completed": { medal: string; courseId: string };
+    "match-won": { data: unknown };
+
+    // Navigation events
+    "navigate-to-arcade-mode-select": Record<string, never>;
+    "start-game": { selectedCharacter: string; gameMode: string };
+    "start-tournament": { selectedCharacter: string };
+
     // Online-specific events
     "online-player-added": { player: unknown; sessionId: string };
     "online-remote-player-update": { player: unknown; sessionId: string };

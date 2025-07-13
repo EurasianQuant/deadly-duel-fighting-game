@@ -13,7 +13,10 @@
       "Bash(rg:*)",
       "Bash(ls:*)",
       "Bash(rm:*)",
-      "Bash(bun remove:*)"
+      "Bash(bun remove:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm i:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }
